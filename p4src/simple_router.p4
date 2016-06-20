@@ -71,13 +71,12 @@ calculated_field ipv4.hdrChecksum  {
 control ingress {
     if(valid(ipv4) and ipv4.ttl > 0) {
         apply(ipv4_lpm);
+	    apply(access_control);
         apply(forward);
-		apply(access_control);
     }
 }
 
 control egress {
     apply(send_frame);
 }
-
 

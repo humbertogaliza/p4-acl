@@ -37,8 +37,8 @@ table access_control {
 		tcp.dstPort: exact;
 	}
 	actions {
-		_nop;
 		_drop;
+        _nop;
 	}
 	size: 256;
 }

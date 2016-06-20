@@ -345,22 +345,11 @@
     "meter_arrays": [],
     "actions": [
         {
-            "name": "_drop",
+            "name": "set_dmac",
             "id": 0,
-            "runtime_data": [],
-            "primitives": [
-                {
-                    "op": "drop",
-                    "parameters": []
-                }
-            ]
-        },
-        {
-            "name": "rewrite_mac",
-            "id": 1,
             "runtime_data": [
                 {
-                    "name": "smac",
+                    "name": "dmac",
                     "bitwidth": 48
                 }
             ],
@@ -372,7 +361,7 @@
                             "type": "field",
                             "value": [
                                 "ethernet",
-                                "srcAddr"
+                                "dstAddr"
                             ]
                         },
                         {
@@ -380,6 +369,17 @@
                             "value": 0
                         }
                     ]
+                }
+            ]
+        },
+        {
+            "name": "_nop",
+            "id": 1,
+            "runtime_data": [],
+            "primitives": [
+                {
+                    "op": "no_op",
+                    "parameters": []
                 }
             ]
         },
@@ -420,7 +420,7 @@
                             "type": "field",
                             "value": [
                                 "standard_metadata",
-                                "egress_spec"
+                                "egress_port"
                             ]
                         },
                         {
@@ -448,11 +448,11 @@
             ]
         },
         {
-            "name": "set_dmac",
+            "name": "rewrite_mac",
             "id": 3,
             "runtime_data": [
                 {
-                    "name": "dmac",
+                    "name": "smac",
                     "bitwidth": 48
                 }
             ],
@@ -464,7 +464,7 @@
                             "type": "field",
                             "value": [
                                 "ethernet",
-                                "dstAddr"
+                                "srcAddr"
                             ]
                         },
                         {
@@ -472,6 +472,17 @@
                             "value": 0
                         }
                     ]
+                }
+            ]
+        },
+        {
+            "name": "_drop",
+            "id": 4,
+            "runtime_data": [],
+            "primitives": [
+                {
+                    "op": "drop",
+                    "parameters": []
                 }
             ]
         }
@@ -483,51 +494,10 @@
             "init_table": "_condition_0",
             "tables": [
                 {
-                    "name": "ecmp_group",
+                    "name": "ipv4_lpm",
                     "id": 0,
                     "match_type": "lpm",
-                    "type": "indirect_ws",
-                    "act_prof_name": "ecmp_action_profile",
-                    "selector": {
-                        "algo": "crc16",
-                        "input": [
-                            {
-                                "type": "field",
-                                "value": [
-                                    "ipv4",
-                                    "srcAddr"
-                                ]
-                            },
-                            {
-                                "type": "field",
-                                "value": [
-                                    "ipv4",
-                                    "dstAddr"
-                                ]
-                            },
-                            {
-                                "type": "field",
-                                "value": [
-                                    "ipv4",
-                                    "protocol"
-                                ]
-                            },
-                            {
-                                "type": "field",
-                                "value": [
-                                    "tcp",
-                                    "srcPort"
-                                ]
-                            },
-                            {
-                                "type": "field",
-                                "value": [
-                                    "tcp",
-                                    "dstPort"
-                                ]
-                            }
-                        ]
-                    },
+                    "type": "simple",
                     "max_size": 1024,
                     "with_counters": false,
                     "direct_meters": null,
@@ -543,15 +513,15 @@
                         }
                     ],
                     "actions": [
-                        "_drop",
-                        "set_nhop"
+                        "set_nhop",
+                        "_drop"
                     ],
                     "next_tables": {
-                        "_drop": "forward",
-                        "set_nhop": "forward"
+                        "set_nhop": "access_control",
+                        "_drop": "access_control"
                     },
                     "default_action": null,
-                    "base_default_next": "forward"
+                    "base_default_next": "access_control"
                 },
                 {
                     "name": "forward",
@@ -582,6 +552,44 @@
                     },
                     "default_action": null,
                     "base_default_next": null
+                },
+                {
+                    "name": "access_control",
+                    "id": 2,
+                    "match_type": "exact",
+                    "type": "simple",
+                    "max_size": 256,
+                    "with_counters": false,
+                    "direct_meters": null,
+                    "support_timeout": false,
+                    "key": [
+                        {
+                            "match_type": "exact",
+                            "target": [
+                                "tcp",
+                                "srcPort"
+                            ],
+                            "mask": null
+                        },
+                        {
+                            "match_type": "exact",
+                            "target": [
+                                "tcp",
+                                "dstPort"
+                            ],
+                            "mask": null
+                        }
+                    ],
+                    "actions": [
+                        "_drop",
+                        "_nop"
+                    ],
+                    "next_tables": {
+                        "_drop": "forward",
+                        "_nop": "forward"
+                    },
+                    "default_action": null,
+                    "base_default_next": "forward"
                 }
             ],
             "conditionals": [
@@ -622,7 +630,7 @@
                             }
                         }
                     },
-                    "true_next": "ecmp_group",
+                    "true_next": "ipv4_lpm",
                     "false_next": null
                 }
             ]
@@ -634,7 +642,7 @@
             "tables": [
                 {
                     "name": "send_frame",
-                    "id": 2,
+                    "id": 3,
                     "match_type": "exact",
                     "type": "simple",
                     "max_size": 256,
@@ -750,48 +758,6 @@
                 }
             ],
             "algo": "csum16"
-        },
-        {
-            "name": "ecmp_hash",
-            "id": 1,
-            "input": [
-                {
-                    "type": "field",
-                    "value": [
-                        "ipv4",
-                        "srcAddr"
-                    ]
-                },
-                {
-                    "type": "field",
-                    "value": [
-                        "ipv4",
-                        "dstAddr"
-                    ]
-                },
-                {
-                    "type": "field",
-                    "value": [
-                        "ipv4",
-                        "protocol"
-                    ]
-                },
-                {
-                    "type": "field",
-                    "value": [
-                        "tcp",
-                        "srcPort"
-                    ]
-                },
-                {
-                    "type": "field",
-                    "value": [
-                        "tcp",
-                        "dstPort"
-                    ]
-                }
-            ],
-            "algo": "crc16"
         }
     ],
     "checksums": [
