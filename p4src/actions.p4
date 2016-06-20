@@ -1,10 +1,5 @@
-
 action _drop() {
     drop();
-}
-
-action _nop() {
-    no_op();
 }
 
 action set_nhop(nhop_ipv4, port) {

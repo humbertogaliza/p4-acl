@@ -175,6 +175,14 @@
                 [
                     "nhop_ipv4",
                     32
+                ],
+                [
+                    "ecmp_offset",
+                    14
+                ],
+                [
+                    "_padding",
+                    2
                 ]
             ],
             "length_exp": null,
@@ -345,8 +353,70 @@
     "meter_arrays": [],
     "actions": [
         {
-            "name": "set_dmac",
+            "name": "set_ecmp_select",
             "id": 0,
+            "runtime_data": [
+                {
+                    "name": "ecmp_base",
+                    "bitwidth": 14
+                },
+                {
+                    "name": "ecmp_count",
+                    "bitwidth": 14
+                }
+            ],
+            "primitives": [
+                {
+                    "op": "modify_field_with_hash_based_offset",
+                    "parameters": [
+                        {
+                            "type": "field",
+                            "value": [
+                                "routing_metadata",
+                                "ecmp_offset"
+                            ]
+                        },
+                        {
+                            "type": "runtime_data",
+                            "value": 0
+                        },
+                        {
+                            "type": "calculation",
+                            "value": "ecmp_hash"
+                        },
+                        {
+                            "type": "runtime_data",
+                            "value": 1
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "_nop",
+            "id": 1,
+            "runtime_data": [],
+            "primitives": [
+                {
+                    "op": "no_op",
+                    "parameters": []
+                }
+            ]
+        },
+        {
+            "name": "_drop",
+            "id": 2,
+            "runtime_data": [],
+            "primitives": [
+                {
+                    "op": "drop",
+                    "parameters": []
+                }
+            ]
+        },
+        {
+            "name": "set_dmac",
+            "id": 3,
             "runtime_data": [
                 {
                     "name": "dmac",
@@ -373,19 +443,8 @@
             ]
         },
         {
-            "name": "_nop",
-            "id": 1,
-            "runtime_data": [],
-            "primitives": [
-                {
-                    "op": "no_op",
-                    "parameters": []
-                }
-            ]
-        },
-        {
             "name": "set_nhop",
-            "id": 2,
+            "id": 4,
             "runtime_data": [
                 {
                     "name": "nhop_ipv4",
@@ -420,7 +479,7 @@
                             "type": "field",
                             "value": [
                                 "standard_metadata",
-                                "egress_port"
+                                "egress_spec"
                             ]
                         },
                         {
@@ -449,7 +508,7 @@
         },
         {
             "name": "rewrite_mac",
-            "id": 3,
+            "id": 5,
             "runtime_data": [
                 {
                     "name": "smac",
@@ -474,17 +533,6 @@
                     ]
                 }
             ]
-        },
-        {
-            "name": "_drop",
-            "id": 4,
-            "runtime_data": [],
-            "primitives": [
-                {
-                    "op": "drop",
-                    "parameters": []
-                }
-            ]
         }
     ],
     "pipelines": [
@@ -494,11 +542,11 @@
             "init_table": "_condition_0",
             "tables": [
                 {
-                    "name": "ipv4_lpm",
+                    "name": "ecmp_group",
                     "id": 0,
                     "match_type": "lpm",
                     "type": "simple",
-                    "max_size": 1024,
+                    "max_size": 512,
                     "with_counters": false,
                     "direct_meters": null,
                     "support_timeout": false,
@@ -513,19 +561,49 @@
                         }
                     ],
                     "actions": [
-                        "set_nhop",
-                        "_drop"
+                        "_drop",
+                        "set_ecmp_select"
                     ],
                     "next_tables": {
-                        "set_nhop": "access_control",
-                        "_drop": "access_control"
+                        "_drop": "ecmp_nhop",
+                        "set_ecmp_select": "ecmp_nhop"
+                    },
+                    "default_action": null,
+                    "base_default_next": "ecmp_nhop"
+                },
+                {
+                    "name": "ecmp_nhop",
+                    "id": 1,
+                    "match_type": "exact",
+                    "type": "simple",
+                    "max_size": 2048,
+                    "with_counters": false,
+                    "direct_meters": null,
+                    "support_timeout": false,
+                    "key": [
+                        {
+                            "match_type": "exact",
+                            "target": [
+                                "routing_metadata",
+                                "ecmp_offset"
+                            ],
+                            "mask": null
+                        }
+                    ],
+                    "actions": [
+                        "_drop",
+                        "set_nhop"
+                    ],
+                    "next_tables": {
+                        "_drop": "access_control",
+                        "set_nhop": "access_control"
                     },
                     "default_action": null,
                     "base_default_next": "access_control"
                 },
                 {
                     "name": "forward",
-                    "id": 1,
+                    "id": 2,
                     "match_type": "exact",
                     "type": "simple",
                     "max_size": 512,
@@ -555,10 +633,10 @@
                 },
                 {
                     "name": "access_control",
-                    "id": 2,
+                    "id": 3,
                     "match_type": "exact",
                     "type": "simple",
-                    "max_size": 256,
+                    "max_size": 1024,
                     "with_counters": false,
                     "direct_meters": null,
                     "support_timeout": false,
@@ -581,12 +659,12 @@
                         }
                     ],
                     "actions": [
-                        "_drop",
-                        "_nop"
+                        "_nop",
+                        "_drop"
                     ],
                     "next_tables": {
-                        "_drop": "forward",
-                        "_nop": "forward"
+                        "_nop": "forward",
+                        "_drop": "forward"
                     },
                     "default_action": null,
                     "base_default_next": "forward"
@@ -630,7 +708,7 @@
                             }
                         }
                     },
-                    "true_next": "ipv4_lpm",
+                    "true_next": "ecmp_group",
                     "false_next": null
                 }
             ]
@@ -642,7 +720,7 @@
             "tables": [
                 {
                     "name": "send_frame",
-                    "id": 3,
+                    "id": 4,
                     "match_type": "exact",
                     "type": "simple",
                     "max_size": 256,
@@ -754,6 +832,48 @@
                     "value": [
                         "ipv4",
                         "dstAddr"
+                    ]
+                }
+            ],
+            "algo": "csum16"
+        },
+        {
+            "name": "ecmp_hash",
+            "id": 1,
+            "input": [
+                {
+                    "type": "field",
+                    "value": [
+                        "ipv4",
+                        "srcAddr"
+                    ]
+                },
+                {
+                    "type": "field",
+                    "value": [
+                        "ipv4",
+                        "dstAddr"
+                    ]
+                },
+                {
+                    "type": "field",
+                    "value": [
+                        "ipv4",
+                        "protocol"
+                    ]
+                },
+                {
+                    "type": "field",
+                    "value": [
+                        "tcp",
+                        "srcPort"
+                    ]
+                },
+                {
+                    "type": "field",
+                    "value": [
+                        "tcp",
+                        "dstPort"
                     ]
                 }
             ],

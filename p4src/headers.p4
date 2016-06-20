@@ -48,10 +48,18 @@ header ethernet_t ethernet;
 header ipv4_t ipv4;
 header tcp_t tcp;
 
-header_type routing_metadata_t {
+/* header_type routing_metadata_t {
     fields {
         nhop_ipv4 : 32;
     }
 }
-
+*/
 metadata routing_metadata_t routing_metadata;
+
+header_type routing_metadata_t {
+    fields {
+        nhop_ipv4 : 32;
+	ecmp_offset: 14;
+        // TODO: if you need extra metadata for ECMP, define it here
+    }
+}

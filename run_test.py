@@ -132,7 +132,7 @@ for d in delays:
     # sendp is too slow...
     # sendp(pkt, iface=port_map[3], verbose=0)
     if args.random_dport:
-        pkt["TCP"].dport = random.randint(1025, 65535)
+        pkt["TCP"].dport = random.randint(1, 1023)
     send_socket.send(str(pkt))
     time.sleep(d / 1000.)
 time.sleep(1)

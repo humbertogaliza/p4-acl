@@ -12,13 +12,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "headers.p4"
-#include "tables.p4"
-#include "actions.p4"
+
+#include "headers.p4" 
 
 parser start {
     return parse_ethernet;
 }
+
+
 
 parser parse_ethernet {
     extract(ethernet);
@@ -28,18 +29,6 @@ parser parse_ethernet {
     }
 }
 
-parser parse_ipv4 {
-    extract(ipv4);
-    return select(latest.protocol) {
-		TCP: parse_tcp;
-		default: ingress;
-	}
-}
-
-parser parse_tcp {
-	extract (tcp);
-	return ingress;
-}
 
 field_list ipv4_checksum_list {
         ipv4.version;
@@ -68,10 +57,133 @@ calculated_field ipv4.hdrChecksum  {
     update ipv4_checksum;
 }
 
+#define IP_PROTOCOLS_TCP 6
+
+parser parse_ipv4 {
+    extract(ipv4);
+    return select(latest.protocol) {
+        IP_PROTOCOLS_TCP : parse_tcp;
+        default: ingress;
+    }
+}
+
+
+parser parse_tcp {
+    extract(tcp);
+    return ingress;
+}
+
+
+action _drop() {
+    drop();
+}
+
+action _nop() {
+    no_op();
+}
+
+action set_nhop(nhop_ipv4, port) {
+    modify_field(routing_metadata.nhop_ipv4, nhop_ipv4);
+    modify_field(standard_metadata.egress_spec, port);
+    add_to_field(ipv4.ttl, -1);
+}
+
+
+field_list ecmp_checksum_list {
+        ipv4.srcAddr;
+        ipv4.dstAddr;
+        ipv4.protocol;
+	    tcp.srcPort;
+        tcp.dstPort;
+}
+
+field_list_calculation ecmp_hash {
+    input {
+        ecmp_checksum_list;
+    }
+    algorithm : csum16;
+    output_width : 10;
+}
+
+
+action set_ecmp_select(ecmp_base, ecmp_count) {
+	modify_field_with_hash_based_offset(routing_metadata.ecmp_offset, ecmp_base, ecmp_hash, ecmp_count);
+}
+
+table ecmp_group {
+    reads {
+	ipv4.dstAddr: lpm;
+    } 
+    actions {
+	    _drop;
+	    set_ecmp_select;
+    }
+    size: 512;
+} 
+
+table ecmp_nhop {
+	reads {
+		routing_metadata.ecmp_offset: exact;
+	}
+	actions {
+		_drop;
+		set_nhop;
+	}
+	size: 2048;
+}
+
+action set_dmac(dmac) {
+    modify_field(ethernet.dstAddr, dmac);
+}
+
+table forward {
+    reads {
+        routing_metadata.nhop_ipv4 : exact;
+    }
+    actions {
+        set_dmac;
+        _drop;
+    }
+    size: 512;
+}
+
+action rewrite_mac(smac) {
+    modify_field(ethernet.srcAddr, smac);
+}
+
+table send_frame {
+    reads {
+        standard_metadata.egress_port: exact;
+    }
+    actions {
+        rewrite_mac;
+        _drop;
+    }
+    size: 256;
+}
+
+
+
+table access_control {
+	reads {
+		tcp.srcPort: exact;
+		tcp.dstPort: exact;
+	}
+	actions {
+        _nop;
+		_drop;
+	}
+	size: 1024;
+}
+
+
 control ingress {
     if(valid(ipv4) and ipv4.ttl > 0) {
-        apply(ipv4_lpm);
-	    apply(access_control);
+        // TODO: implement ECMP here
+	    apply(ecmp_group);
+        apply(ecmp_nhop);
+        //apply(ipv4_lpm);
+        apply(access_control);
         apply(forward);
     }
 }
@@ -79,4 +191,3 @@ control ingress {
 control egress {
     apply(send_frame);
 }
-

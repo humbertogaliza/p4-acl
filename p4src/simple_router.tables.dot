@@ -5,14 +5,14 @@ digraph g {
    _condition_0 -> buffer [arrowhead=odot];
    _condition_0 -> ipv4_lpm [arrowhead=dot];
    ipv4_lpm [shape=ellipse];
-   ipv4_lpm -> forward [arrowhead=normal label="set_nhop"];
-   forward [shape=ellipse];
-   forward -> access_control [arrowhead=normal label="set_dmac"];
+   ipv4_lpm -> access_control [arrowhead=normal label="set_nhop"];
    access_control [shape=ellipse];
-   access_control -> buffer [arrowhead=normal label="_nop"];
-   access_control -> buffer [arrowhead=normal label="_drop"];
-   forward -> access_control [arrowhead=normal label="_drop"];
-   ipv4_lpm -> forward [arrowhead=normal label="_drop"];
+   access_control -> forward [arrowhead=normal label="_drop"];
+   forward [shape=ellipse];
+   forward -> buffer [arrowhead=normal label="set_dmac"];
+   forward -> buffer [arrowhead=normal label="_drop"];
+   access_control -> forward [arrowhead=normal label="_nop"];
+   ipv4_lpm -> access_control [arrowhead=normal label="_drop"];
    buffer -> send_frame
    send_frame [shape=ellipse];
    send_frame -> egress [arrowhead=normal label="rewrite_mac"];

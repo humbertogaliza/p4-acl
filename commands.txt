@@ -1,12 +1,21 @@
 table_set_default send_frame _drop
 table_set_default forward _drop
-table_set_default ipv4_lpm _drop
+table_set_default ecmp_group _drop
+table_set_default ecmp_nhop _drop
 table_set_default access_control _nop
 table_add send_frame rewrite_mac 1 => 00:aa:bb:00:00:00
 table_add send_frame rewrite_mac 2 => 00:aa:bb:00:00:01
-table_add forward set_dmac 10.0.0.10 => 00:04:00:00:00:00
-table_add forward set_dmac 10.0.1.10 => 00:04:00:00:00:01
-table_add ipv4_lpm set_nhop 10.0.0.10/32 => 10.0.0.10 1
-table_add ipv4_lpm set_nhop 10.0.1.10/32 => 10.0.1.10 2
-table_add access_control _nop 20 80 =>  
-table_add access_control _nop 1024 443 => 
+table_add forward set_dmac 10.0.1.1 => 00:04:00:00:00:00
+table_add forward set_dmac 10.0.2.1 => 00:04:00:00:00:01
+table_add ecmp_group set_ecmp_select 10.0.0.1/32 => 0 2
+table_add ecmp_nhop set_nhop 0 => 10.0.1.1 1
+table_add ecmp_nhop set_nhop 1 => 10.0.2.1 2
+table_add access_control _nop 20 80 =>
+table_add access_control _drop 20 1 =>
+table_add access_control _drop 20 10 =>
+table_add access_control _drop 20 100 =>
+table_add access_control _drop 20 200 =>
+table_add access_control _drop 20 443 =>
+table_add access_control _drop 20 53 =>
+table_add access_control _drop 20 143 =>
+table_add access_control _drop 20 25 =>

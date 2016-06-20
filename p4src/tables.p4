@@ -31,14 +31,3 @@ table send_frame {
     size: 256;
 }
 
-table access_control {
-	reads {
-		tcp.srcPort: exact;
-		tcp.dstPort: exact;
-	}
-	actions {
-		_drop;
-        _nop;
-	}
-	size: 256;
-}
